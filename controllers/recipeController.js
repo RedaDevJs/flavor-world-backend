@@ -1,234 +1,143 @@
-import recipeModel from "../models/recipeModel.js";
-import multer from 'multer';
+const RecipeModel = require('../Models/recipe')
+const upload = require('../MiddleWares/multerMiddleware')
 
+//reading all the recipes
 
-// Configurer Multer pour stocker les images dans la mémoire
-// const storage = multer.memoryStorage(); 
-//const upload = multer({ storage: storage });
-// const upload = multer({ dest: 'public/assets/all-images/img-recipes/' })
-
-
-export const newRecipe = async (req, res) => {
-  const { title, author, category, origin, ingredients, steps } = req.body;
-
-  // Validate request body
-  if (!title || !author || !category || !origin || !ingredients || !steps) {
-    return res.status(400).json({ message: 'Fill in all fields.' });
-  }
-
-  // Check if ingredients or steps are empty
-  if (ingredients.length === 0 || steps.length === 0) {
-    return res.status(400).json({ message: 'Fill in all fields.' });
-  }
-
+const readAll = async (req, res, next) => {
   try {
-    let pictureUrl = ''; // Default empty string for picture URL
-
-    // Check if an image was uploaded
-    if (req.file) {
-      pictureUrl = `/assets/all-images/img-recipes/${req.file.filename}`; // Assuming '/images' is the path where images are served
+    const dataRecepies = await RecipeModel.find()
+    return res.json({
+      data: dataRecepies,
+    })
+  } catch (error) {
+    return res.json({
+      error: error.message,
+    })
+  }
+}
+//reading recipe by id
+const readById = async (req, res, next) => {
+  try {
+    //get id
+    const recipeId = req.params.id
+    //verify that server got the id
+    console.log('Received request with ID:', recipeId)
+    const response = await RecipeModel.findById(recipeId)
+    if (!response) {
+      res.status(404).json({ error: 'Recipe not found' })
+      return
     }
 
-    const newRecipe = await recipeModel.create({
+    res.json({ data: response })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: 'An error occurred' })
+  }
+}
+
+//reading a single recipe by title
+const readByTitle = async (req, res, next) => {
+  try {
+    const { title } = req.query
+    console.log('Received request with title:', title)
+
+    // Use findOne instead of findById for searching by name
+    const response = await RecipeModel.findOne({ title: title })
+
+    if (!response) {
+      res.status(404).json({ error: 'Recipe not found' })
+      return
+    }
+
+    res.json({ data: response })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: 'An error occurred' })
+  }
+}
+
+// creating a single recipe
+const create = async (req, res, next) => {
+  const {
+    title,
+    category,
+    author,
+    origin,
+    ingredients,
+    steps
+  } = req.body
+  try {
+    const newRecipe = await RecipeModel.create({
       title,
-      author,
       category,
+      author,
       origin,
       ingredients,
-      steps,
-      picture: pictureUrl,
-    });
+      steps
+    })
 
-    res.status(201).json(newRecipe);
+    res.status(201).json({
+      data: newRecipe,
+      message: 'New recipe added successfully',
+    })
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error)
+    res.status(500).json({
+      error: error.message,
+      message: 'An error occurred',
+    })
   }
 }
 
-export const updateRecipe = async (req, res) => {
+//update single recipe using id
+const updateById = async (req, res, next) => {
   try {
-    const { title, author, category, origin, ingredients, steps } = req.body;
+    const recipeId = req.params.id;
+    const updatedData = req.body;
 
-    // Validate request body
-    if (!title && !author && !category && !origin && !ingredients && !steps) {
-      return res.status(400).json({ message: 'Fill in all fields.' });
+    // Verify that server got the id and updated data
+    console.log('Received request with ID:', recipeId);
+    console.log('Updated data:', updatedData);
+
+    const response = await RecipeModel.findByIdAndUpdate(recipeId, updatedData, { new: true });
+
+    if (!response) {
+      res.status(404).json({ error: 'Recipe not found' });
+      return;
     }
 
-    // Check if ingredients or steps are empty
-    if (ingredients.length === 0 || steps.length === 0) {
-      return res.status(400).json({ message: 'Fill in all fields.' });
-    }
-
-    const existingRecipe = await recipeModel.findById(req.params.id);
-
-    if (!existingRecipe) {
-      return res.status(404).json({ message: `Recipe ID ${req.params.id} not found` });
-    }
-
-    let pictureUrl = existingRecipe.picture || ''; // Default to existing picture URL
-
-    // Check if a new image was uploaded
-    if (req.file) {
-      // Assuming 'photo' is the name attribute of your file input
-      pictureUrl = `/assets/all-images/img-recipes/${req.file.filename}`;
-    }
-
-    const updatedRecipe = await recipeModel.findByIdAndUpdate(req.params.id, {
-      title: title || existingRecipe.title,
-      author: author || existingRecipe.author,
-      category: category || existingRecipe.category,
-      origin: origin || existingRecipe.origin,
-      ingredients: ingredients || existingRecipe.ingredients,
-      steps: steps || existingRecipe.steps,
-      picture: pictureUrl,
-    }, { new: true });
-
-    res.json(updatedRecipe);
+    res.json({ message: 'Recipe is updated successfully', data: response });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred' });
   }
 };
 
-// Appliquer le middleware à la route updateRecipe
-//updateRecipe.upload = upload.single('photo');
-export default updateRecipe;
+//delete single recipe using id
 
-
-// export const updateRecipe = async (req, res) => {
-//   try {
-//     const { title, author, category, origin, ingredients, steps } = req.body;
-
-//     // Validate request body
-//     if (!title && !author && !category && !origin && !ingredients && !steps) {
-//       return res.status(400).json({ message: 'Fill in all fields.' });
-//     }
-
-//     // Check if ingredients or steps are empty
-//     if (ingredients.length === 0 || steps.length === 0) {
-//       return res.status(400).json({ message: 'Fill in all fields.' });
-//     }
-
-//     const existingRecipe = await recipeModel.findById(req.params.id);
-
-//     if (!existingRecipe) {
-//       return res.status(404).json({ message: `Recipe ID ${req.params.id} not found` });
-//     }
-
-//     let pictureUrl = existingRecipe.picture || ''; // Default to existing picture URL
-
-//     // Check if a new image was uploaded
-//     if (req.file) {
-//       // Assuming 'photo' is the name attribute of your file input
-//       pictureUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-//     }
-
-//     const updatedRecipe = await recipeModel.findByIdAndUpdate(req.params.id, {
-//       title: title || existingRecipe.title,
-//       author: author || existingRecipe.author,
-//       category: category || existingRecipe.category,
-//       origin: origin || existingRecipe.origin,
-//       ingredients: ingredients || existingRecipe.ingredients,
-//       steps: steps || existingRecipe.steps,
-//       picture: pictureUrl,
-//     }, { new: true });
-
-//     res.json(updatedRecipe);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-//   // Apply the middleware to the updateRecipe route
-//   updateRecipe.upload = upload.single('photo');
-//   export default updateRecipe;
-
-
-
-
-
-
-export const getAllRecipes = async (req, res) => {
+const deleteById = async (req, res, next) => {
   try {
-    const recipes = await recipeModel.find();
-    res.json(recipes);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const recipeId = req.params.id
+    //verify that server got the id
+    console.log('Received request with ID:', recipeId)
 
-export const getOne = async (req, res) => {
-  try {
-    const requestedRecipe = await recipeModel.findById(req.params.id);
-    if (!requestedRecipe) {
-      return res.status(404).json({ message: `Recipe ID ${req.params.id} not found` });
+    const response = await RecipeModel.findByIdAndDelete(recipeId)
+    if (!response) {
+      res.status(404).json({ error: 'Recipe not found' })
+      
     }
-    res.json(requestedRecipe);
+
+    res.json({ message: 'Recipe is deleted successfully', data: response })
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error); 
+    res.status(500).json({ error: 'An error occurred' })
   }
 }
-
-
-
-
-
-// export const updateRecipe = async (req, res) => {
-//   try {
-//     const { title, author, category, origin, ingredients, steps } = req.body;
-
-//     // Validate request body
-//     if (!title && !author && !category && !origin && !ingredients && !steps) {
-//       return res.status(400).json({ message: 'Fill in all fields.' });
-//     }
-
-//     // Check if ingredients or steps are empty
-//     if (ingredients.length === 0 || steps.length === 0) {
-//       return res.status(400).json({ message: 'Fill in all fields.' });
-//     }
-
-//     const existingRecipe = await recipeModel.findById(req.params.id);
-
-//     if (!existingRecipe) {
-//       return res.status(404).json({ message: `Recipe ID ${req.params.id} not found` });
-//     }
-
-//     let pictureUrl = existingRecipe.picture || ''; // Default to existing picture URL
-
-//     // Check if a new image was uploaded
-//     if (req.file) {
-//       // Assuming 'photo' is the name attribute of your file input
-//       pictureUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-//     }
-
-//     const updatedRecipe = await recipeModel.findByIdAndUpdate(req.params.id, {
-//       title: title || existingRecipe.title,
-//       author: author || existingRecipe.author,
-//       category: category || existingRecipe.category,
-//       origin: origin || existingRecipe.origin,
-//       ingredients: ingredients || existingRecipe.ingredients,
-//       steps: steps || existingRecipe.steps,
-//       picture: pictureUrl,
-//     }, { new: true });
-
-//     res.json(updatedRecipe);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-//   // Apply the middleware to the updateRecipe route
-//   updateRecipe.upload = upload.single('photo');
-//   export default updateRecipe;
-
-
-export const deleteRecipe = async (req, res) => {
-  try {
-    const deletedRecipe = await recipeModel.findByIdAndDelete(req.params.id);
-
-    if (!deletedRecipe) {
-      return res.status(404).json({ message: `Recipe ID ${req.params.id} not found` });
-    }
-
-    res.json({ id: req.params.id });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+module.exports = {
+  readAll,
+  readByTitle,
+  readById,
+  create,
+  updateById,
+  deleteById,
 }
